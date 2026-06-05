@@ -1,0 +1,1869 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>School RPG - Retro Arcade Gamificación</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Inyección de configuración Tailwind para alterar los colores base a tonos Arcade Pastel -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              300: '#e2e8f0', 
+              400: '#a3b1c6',
+              800: '#3b4252',
+              850: '#2e3440',
+              900: '#232831',
+              950: '#15181e', /* Fondo oscuro profundo */
+            },
+            indigo: { 
+              400: '#7bb0ff', /* Azul pastel neón */
+              500: '#5c98ff',
+              600: '#3d7fff',
+            },
+            emerald: { 
+              400: '#6be8a3', /* Verde pastel neón */
+              500: '#46db8a',
+              600: '#2db86e',
+            },
+            amber: { 
+              400: '#ffd05c', /* Oro pastel */
+              500: '#f5b52a',
+            },
+            purple: {
+              400: '#c58dff', /* Morado pastel */
+              600: '#9b5de5',
+            }
+          },
+          fontFamily: {
+            /* Forzamos a que toda la app use la tipografía RPG por defecto */
+            sans: ['"VT323"', 'monospace'],
+            pixel: ['"Press Start 2P"', 'monospace'],
+            rpg: ['"VT323"', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #101216;
+      --border-neon: #7bb0ff;
+    }
+    
+    body {
+      background-color: var(--bg-dark);
+      color: #f1f5f9;
+      min-height: 100vh;
+      font-size: 1.15rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* --- EFECTO REJILLA INFINITA (Synthwave/Retro 3D) --- */
+    .infinite-grid-wrapper {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      overflow: hidden;
+      z-index: -2;
+      background-color: var(--bg-dark);
+    }
+
+    /* Línea del horizonte brillante */
+    .infinite-grid-wrapper::after {
+      content: '';
+      position: absolute;
+      top: 55%; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, #7bb0ff, #c58dff, #6be8a3, transparent);
+      box-shadow: 0 0 20px 3px rgba(123, 176, 255, 0.4);
+    }
+
+    /* Rejilla animada */
+    .infinite-grid {
+      position: absolute;
+      top: 55%; left: -50%; width: 200%; height: 100vh;
+      background-image: 
+        linear-gradient(rgba(123, 176, 255, 0.4) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(123, 176, 255, 0.4) 2px, transparent 2px);
+      background-size: 40px 40px;
+      transform: perspective(600px) rotateX(75deg) translateZ(0);
+      transform-origin: top center;
+      animation: grid-scroll 2s linear infinite;
+    }
+
+    @keyframes grid-scroll {
+      0% { transform: perspective(600px) rotateX(75deg) translateY(0); }
+      100% { transform: perspective(600px) rotateX(75deg) translateY(40px); }
+    }
+
+    /* --- EFECTO PANTALLA CRT (Scanlines) --- */
+    .scanlines {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
+      background-size: 100% 4px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    /* --- ESTILO DE PANELES (Tipo Pokémon / Arcade UI) --- */
+    .rpg-panel {
+      background: rgba(21, 24, 30, 0.95);
+      border: 4px solid var(--border-neon);
+      border-radius: 8px;
+      box-shadow: 
+        inset 0 0 0 3px rgba(21, 24, 30, 1), 
+        inset 0 0 0 5px var(--border-neon),  
+        0 8px 0 rgba(0, 0, 0, 0.6),          
+        0 0 20px rgba(123, 176, 255, 0.15);  
+      backdrop-filter: blur(4px);
+      margin-bottom: 8px;
+    }
+
+    .rpg-card {
+      background: rgba(35, 40, 49, 0.9);
+      border: 3px solid #3b4252;
+      border-radius: 6px;
+      box-shadow: 0 5px 0 rgba(0,0,0,0.4);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .rpg-card:hover {
+      border-color: #6be8a3;
+      box-shadow: 
+        0 5px 0 rgba(0,0,0,0.5),
+        0 0 15px rgba(107, 232, 163, 0.3);
+      transform: translateY(-2px);
+    }
+
+    /* --- MARQUEE Y FLICKER (Adaptados a Chunky UI) --- */
+    @keyframes neon-flicker {
+      0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        border-color: var(--border-neon);
+        box-shadow: 
+          inset 0 0 0 3px rgba(21, 24, 30, 1), 
+          inset 0 0 0 5px var(--border-neon),  
+          0 8px 0 rgba(0, 0, 0, 0.6),          
+          0 0 20px rgba(123, 176, 255, 0.15);
+      }
+      20%, 24%, 55% {
+        border-color: rgba(123, 176, 255, 0.3);
+        box-shadow: 
+          inset 0 0 0 3px rgba(21, 24, 30, 1), 
+          inset 0 0 0 5px rgba(123, 176, 255, 0.1),  
+          0 8px 0 rgba(0, 0, 0, 0.6),          
+          0 0 4px rgba(123, 176, 255, 0.05);
+      }
+    }
+
+    .flicker-neon {
+      animation: neon-flicker 9s infinite ease-in-out;
+    }
+
+    .marquee-container {
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      background: rgba(21, 24, 30, 0.95);
+      border: 4px solid #c58dff; /* Morado pastel para destacar el marquee */
+      border-radius: 8px;
+      box-shadow: 
+        inset 0 0 0 3px rgba(21, 24, 30, 1), 
+        inset 0 0 0 5px #c58dff,  
+        0 6px 0 rgba(0, 0, 0, 0.6);
+      margin-bottom: 8px;
+    }
+
+    .marquee-content {
+      display: inline-block;
+      white-space: nowrap;
+      padding-left: 100%;
+      animation: marquee-scroll 38s linear infinite;
+    }
+
+    .marquee-container:hover .marquee-content {
+      animation-play-state: paused;
+    }
+
+    @keyframes marquee-scroll {
+      0% { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-100%, 0, 0); }
+    }
+
+    /* Asegurar tipografías en elementos interactivos */
+    input, select, textarea, button {
+      font-family: 'VT323', monospace !important;
+      font-size: 1.2rem !important;
+      letter-spacing: 0.5px;
+    }
+    
+    button {
+      text-transform: uppercase;
+    }
+
+    .pixelated {
+      image-rendering: pixelated;
+    }
+
+    /* Custom Scrollbar Arcade */
+    ::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+      border-left: 2px solid #232831;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #c58dff;
+      border: 3px solid var(--bg-dark);
+      border-radius: 6px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #7bb0ff;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.8; text-shadow: 0 0 10px rgba(255, 208, 92, 0.5); }
+      50% { opacity: 0.4; text-shadow: none; }
+    }
+    .pulsing-glow {
+      animation: pulse-glow 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+
+<body class="p-3 md:p-6 text-slate-200">
+  
+  <!-- Elementos estéticos de fondo -->
+  <div class="infinite-grid-wrapper"><div class="infinite-grid"></div></div>
+  <div class="scanlines"></div>
+
+  <!-- Contenedor principal de React -->
+  <div id="root" class="relative z-10"></div>
+
+  <script type="text/babel">
+    const { useEffect, useMemo, useState } = React;
+
+    const LS = {
+      users: 'schoolrpg_users',
+      current: 'schoolrpg_current',
+      tasks: 'schoolrpg_tasks',
+      rewards: 'schoolrpg_rewards',
+      backpacks: 'schoolrpg_backpacks',
+      inventory: 'schoolrpg_inventory',
+      items: 'schoolrpg_items',
+      notifications: 'schoolrpg_notifications',
+      settings: 'schoolrpg_settings',
+      images: 'schoolrpg_images',
+      marquee: 'schoolrpg_marquee'
+    };
+
+    const uid = () => Math.random().toString(36).slice(2, 10);
+    const load = (k, fallback) => {
+      try {
+        const val = localStorage.getItem(k);
+        return val ? JSON.parse(val) : fallback;
+      } catch {
+        return fallback;
+      }
+    };
+    const save = (k, v) => {
+      try {
+        localStorage.setItem(k, JSON.stringify(v));
+      } catch (e) {
+        console.error("Error saving to localStorage", e);
+      }
+    };
+
+    const nowISO = () => new Date().toISOString();
+    const roleLabel = r => ({ admin: 'Director', teacher: 'Profesor', student: 'Estudiante' }[r] || r);
+    const randomOf = arr => arr[Math.floor(Math.random() * arr.length)];
+    const xpNeed = lvl => Math.floor(100 * Math.pow(lvl, 1.5));
+    const timeLabel = iso => new Date(iso).toLocaleString('es-PE', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    const characters = [
+      { name: 'Roca', class: 'Fuerza', emoji: '🏔️' },
+      { name: 'Titan', class: 'Fuerza', emoji: '⚔️' },
+      { name: 'Furia', class: 'Fuerza', emoji: '🔥' },
+      { name: 'Veloz', class: 'Agilidad', emoji: '⚡' },
+      { name: 'Flecha', class: 'Agilidad', emoji: '🏹' },
+      { name: 'Eco', class: 'Agilidad', emoji: '🌌' },
+      { name: 'Sage', class: 'Inteligencia', emoji: '🔮' },
+      { name: 'Nova', class: 'Inteligencia', emoji: '⭐' },
+      { name: 'Astra', class: 'Inteligencia', emoji: '📖' }
+    ];
+
+    const initialBackpacks = {
+      level1: { name: 'Mochila de Recluta (Nvl 1)', capacity: 5, requires: 'Disponible desde el inicio', equipped: true, levelReq: 1, emoji: '🎒' },
+      level2: { name: 'Mochila del Viajero (Nvl 2)', capacity: 10, requires: 'Requiere Nivel 10', equipped: false, levelReq: 10, emoji: '🧳' },
+      level3: { name: 'Mochila del Alquimista (Nvl 3)', capacity: 15, requires: 'Requiere Nivel 20', equipped: false, levelReq: 20, emoji: '💼' }
+    };
+
+    const defaultItems = [
+      { id: 'item_1', name: 'Manzana de la Sabiduría', description: 'Consumible mágico que otorga un impulso de concentración instantáneo.', price: 15, useType: 'Uso Único', emoji: '🍎' },
+      { id: 'item_2', name: 'Botella de Agua con Escudo', description: 'Mantiene al héroe hidratado y aumenta la resistencia al cansancio escolar.', price: 25, useType: 'Uso Múltiple', emoji: '🛡️' },
+      { id: 'item_3', name: 'Capa de Delegado', description: 'Equipamiento cosmético pasivo que impone respeto en el aula.', price: 50, useType: 'No Utilizable', emoji: '🧣' },
+      { id: 'item_4', name: 'Tomo de Álgebra Antigua', description: 'Un manual pesado útil para resolver desafíos intelectuales complejos.', price: 30, useType: 'Uso Múltiple', emoji: '📘' },
+      { id: 'item_5', name: 'Bocadillo de Recuperación', description: 'Restaura la vitalidad del estudiante tras un largo período de exámenes.', price: 10, useType: 'Uso Único', emoji: '🥪' },
+      { id: 'item_6', name: 'Insignia del Héroe del Aula', description: 'Otorga prestigio pasivo. Un tesoro codiciado por todos.', price: 100, useType: 'No Utilizable', emoji: '🏅' }
+    ];
+
+    const defaultSettings = {
+      adminAvatar: '',
+      teacherAvatar: '',
+      studentAvatar: ''
+    };
+
+    function ensureInit() {
+      const users = load(LS.users, []);
+      if (users.length === 0) {
+        const seedUsers = [
+          {
+            id: 'admin',
+            role: 'admin',
+            name: 'Director Albus',
+            username: 'admin',
+            password: 'admin123',
+            level: 1,
+            xp: 0,
+            amz: 500,
+            character: '',
+            stats: { strength: 10, agility: 10, intelligence: 10 },
+            tasksCompleted: 0,
+            lastTaskAt: null,
+            backpack: 'level1',
+            avatar: ''
+          },
+          {
+            id: 'teacher_1',
+            role: 'teacher',
+            name: 'Profa. Minerva',
+            username: 'teacher',
+            password: 'teacher123',
+            level: 5,
+            xp: 300,
+            amz: 100,
+            character: '',
+            stats: { strength: 8, agility: 10, intelligence: 20 },
+            tasksCompleted: 0,
+            lastTaskAt: null,
+            backpack: 'level1',
+            avatar: ''
+          },
+          {
+            id: 'student_1',
+            role: 'student',
+            name: 'Arturo Pendragon',
+            username: 'student',
+            password: 'student123',
+            course: '6to de Primaria',
+            character: 'Titan',
+            level: 8,
+            xp: 120,
+            amz: 150,
+            stats: { strength: 15, agility: 12, intelligence: 8 },
+            tasksCompleted: 5,
+            lastTaskAt: nowISO(),
+            backpack: 'level1',
+            avatar: ''
+          }
+        ];
+        save(LS.users, seedUsers);
+      }
+
+      if (!localStorage.getItem(LS.current)) save(LS.current, null);
+      
+      const tasks = load(LS.tasks, []);
+      if (tasks.length === 0) {
+        const seedTasks = [
+          {
+            id: 'task_1',
+            title: 'Resolver Cuestionario de Ciencias',
+            description: 'Completar el informe de laboratorio sobre ecosistemas amazónicos.',
+            type: 'global',
+            creatorId: 'teacher_1',
+            creatorName: 'Profa. Minerva',
+            creatorRole: 'teacher',
+            createdAt: nowISO(),
+            expiresAt: null,
+            reward: { xp: 45, amz: 15, attr: 'intelligence', attrAmount: 0.5 }
+          },
+          {
+            id: 'task_2',
+            title: 'Apoyo en Orden del Aula',
+            description: 'Organizar los estantes de libros y limpiar las pizarras al terminar las clases.',
+            type: 'course',
+            targetCourse: '6to de Primaria',
+            creatorId: 'admin',
+            creatorName: 'Director Albus',
+            creatorRole: 'admin',
+            createdAt: nowISO(),
+            expiresAt: null,
+            reward: { xp: 30, amz: 10, attr: 'strength', attrAmount: 0.3 }
+          }
+        ];
+        save(LS.tasks, seedTasks);
+      }
+
+      if (!localStorage.getItem(LS.rewards)) save(LS.rewards, []);
+      if (!localStorage.getItem(LS.backpacks)) save(LS.backpacks, initialBackpacks);
+      if (!localStorage.getItem(LS.inventory)) {
+        save(LS.inventory, {
+          student_1: [
+            { itemId: 'item_1', qty: 2, uses: 0 },
+            { itemId: 'item_2', qty: 1, uses: 1 }
+          ]
+        });
+      }
+      if (!localStorage.getItem(LS.items)) save(LS.items, defaultItems);
+      if (!localStorage.getItem(LS.notifications)) save(LS.notifications, []);
+      if (!localStorage.getItem(LS.settings)) save(LS.settings, defaultSettings);
+    }
+
+    // Call init right away
+    ensureInit();
+
+    function App() {
+      const [users, setUsers] = useState(() => load(LS.users, []));
+      const [current, setCurrent] = useState(() => load(LS.current, null));
+      const [tasks, setTasks] = useState(() => load(LS.tasks, []));
+      const [rewards, setRewards] = useState(() => load(LS.rewards, []));
+      const [backpacks, setBackpacks] = useState(() => load(LS.backpacks, initialBackpacks));
+      const [inventory, setInventory] = useState(() => load(LS.inventory, {}));
+      const [items, setItems] = useState(() => load(LS.items, defaultItems));
+      const [notifications, setNotifications] = useState(() => load(LS.notifications, []));
+      const [marqueeText, setMarqueeText] = useState(() => load(LS.marquee, "⚡ ¡BIENVENIDOS A LA CABINA ARCADE DE SCHOOL RPG! COMPLETA MISIONES DE ROL PARA SUBIR DE NIVEL ⚡"));
+      const [tab, setTab] = useState('home');
+
+      // Custom dialog states
+      const [toasts, setToasts] = useState([]);
+      const [confirmModal, setConfirmModal] = useState(null);
+      const [levelUpOverlay, setLevelUpOverlay] = useState(null); 
+
+      // Form States
+      const [login, setLogin] = useState({ username: '', password: '' });
+      const [userForm, setUserForm] = useState({ name: '', username: '', password: '', role: 'student', character: 'Titan', course: '6to de Primaria' });
+      const [taskForm, setTaskForm] = useState({
+        title: '', description: '', type: 'global', targetCourse: '6to de Primaria', xp: 30, amz: 10, attr: 'intelligence', attrAmount: 0.4
+      });
+      const [itemForm, setItemForm] = useState({ id: '', name: '', description: '', price: 15, useType: 'Uso Único', emoji: '🎁' });
+      
+      const [selectedTask, setSelectedTask] = useState('');
+      const [selectedStudent, setSelectedStudent] = useState('');
+      const [selectedItemToUse, setSelectedItemToUse] = useState('');
+      const [selectedTeacherForUse, setSelectedTeacherForUse] = useState('');
+
+      useEffect(() => { save(LS.users, users); }, [users]);
+      useEffect(() => { save(LS.current, current); }, [current]);
+      useEffect(() => { save(LS.tasks, tasks); }, [tasks]);
+      useEffect(() => { save(LS.rewards, rewards); }, [rewards]);
+      useEffect(() => { save(LS.backpacks, backpacks); }, [backpacks]);
+      useEffect(() => { save(LS.inventory, inventory); }, [inventory]);
+      useEffect(() => { save(LS.items, items); }, [items]);
+      useEffect(() => { save(LS.notifications, notifications); }, [notifications]);
+      useEffect(() => { save(LS.marquee, marqueeText); }, [marqueeText]);
+
+      const showToast = (message, type = 'success') => {
+        const id = uid();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 4000);
+      };
+
+      const triggerConfirm = (message, onConfirm) => {
+        setConfirmModal({ message, onConfirm });
+      };
+
+      const currentUser = useMemo(() => {
+        if (!current) return null;
+        return users.find(u => u.id === current.id) || null;
+      }, [users, current]);
+
+      const studentUsers = useMemo(() => users.filter(u => u.role === 'student'), [users]);
+      const teacherUsers = useMemo(() => users.filter(u => u.role === 'teacher'), [users]);
+
+      const myInventory = useMemo(() => {
+        if (!currentUser) return [];
+        return inventory[currentUser.id] || [];
+      }, [inventory, currentUser]);
+
+      const myCapacityUsed = useMemo(() => {
+        return myInventory.reduce((sum, item) => sum + item.qty, 0);
+      }, [myInventory]);
+
+      const applyLevelUpCheck = (u) => {
+        let level = u.level || 1;
+        let xp = u.xp || 0;
+        let needed = xpNeed(level);
+        let upgraded = false;
+
+        while (xp >= needed && level < 100) {
+          xp -= needed;
+          level += 1;
+          needed = xpNeed(level);
+          upgraded = true;
+        }
+
+        if (upgraded) {
+          setLevelUpOverlay({ level, studentName: u.name });
+          showToast(`¡Subida de nivel! ${u.name} es ahora nivel ${level}`, 'gold');
+        }
+
+        return { ...u, level, xp };
+      };
+
+      const patchUser = (id, patch) => {
+        setUsers(prev => prev.map(u => {
+          if (u.id === id) {
+            const updated = { ...u, ...patch };
+            return u.role === 'student' ? applyLevelUpCheck(updated) : updated;
+          }
+          return u;
+        }));
+      };
+
+      const handleLogin = () => {
+        if (!login.username || !login.password) {
+          showToast('Por favor, ingresa tu usuario y clave', 'error');
+          return;
+        }
+        const found = users.find(u => u.username.toLowerCase() === login.username.toLowerCase() && u.password === login.password);
+        if (found) {
+          setCurrent({ id: found.id, role: found.role });
+          showToast(`¡Sesión iniciada como ${found.name}!`, 'success');
+          setTab('home');
+        } else {
+          showToast('Credenciales incorrectas, intenta de nuevo.', 'error');
+        }
+      };
+
+      const handleLogout = () => {
+        setCurrent(null);
+        showToast('Has cerrado sesión.', 'info');
+      };
+
+      const simulateSwitch = (targetUser) => {
+        setCurrent({ id: targetUser.id, role: targetUser.role });
+        showToast(`Cambiado al perfil de: ${targetUser.name}`, 'info');
+      };
+
+      const handleCreateUser = () => {
+        if (!userForm.name || !userForm.username || !userForm.password) {
+          showToast('Completa todos los campos obligatorios.', 'error');
+          return;
+        }
+        if (users.some(u => u.username.toLowerCase() === userForm.username.toLowerCase())) {
+          showToast('Este nombre de usuario ya está registrado.', 'error');
+          return;
+        }
+
+        const newUser = {
+          id: 'u_' + uid(),
+          role: userForm.role,
+          name: userForm.name,
+          username: userForm.username,
+          password: userForm.password,
+          course: userForm.role === 'student' ? userForm.course : '',
+          character: userForm.role === 'student' ? userForm.character : '',
+          level: 1,
+          xp: 0,
+          amz: 50,
+          backpack: 'level1',
+          avatar: '',
+          stats: { strength: 1, agility: 1, intelligence: 1 },
+          tasksCompleted: 0,
+          lastTaskAt: null
+        };
+
+        setUsers(prev => [...prev, newUser]);
+        showToast(`Usuario ${newUser.name} creado exitosamente.`, 'success');
+        setUserForm({ name: '', username: '', password: '', role: 'student', character: 'Titan', course: '6to de Primaria' });
+      };
+
+      const handleDeleteUser = (id) => {
+        triggerConfirm('¿Estás seguro de que deseas eliminar este personaje?', () => {
+          setUsers(prev => prev.filter(u => u.id !== id));
+          showToast('Personaje eliminado correctamente.', 'info');
+        });
+      };
+
+      const handleCreateTask = () => {
+        if (!taskForm.title || !taskForm.description) {
+          showToast('Ingresa título y descripción para la misión.', 'error');
+          return;
+        }
+
+        const newTask = {
+          id: 'task_' + uid(),
+          title: taskForm.title,
+          description: taskForm.description,
+          type: taskForm.type,
+          creatorId: currentUser?.id || 'admin',
+          creatorName: currentUser?.name || 'Administrador',
+          creatorRole: currentUser?.role || 'admin',
+          targetCourse: taskForm.type === 'course' ? taskForm.targetCourse : '',
+          createdAt: nowISO(),
+          reward: {
+            xp: Number(taskForm.xp),
+            amz: Number(taskForm.amz),
+            attr: taskForm.attr,
+            attrAmount: Number(taskForm.attrAmount)
+          }
+        };
+
+        setTasks(prev => [newTask, ...prev]);
+        showToast('¡Nueva misión de clase publicada!', 'success');
+        setTaskForm({ ...taskForm, title: '', description: '' });
+      };
+
+      const handleDeleteTask = (id) => {
+        triggerConfirm('¿Quieres borrar permanentemente esta misión?', () => {
+          setTasks(prev => prev.filter(t => t.id !== id));
+          showToast('Misión eliminada del mapa escolar.', 'info');
+        });
+      };
+
+      const handleValidateTask = () => {
+        if (!selectedTask || !selectedStudent) {
+          showToast('Selecciona la misión y el estudiante.', 'error');
+          return;
+        }
+        const task = tasks.find(t => t.id === selectedTask);
+        const student = users.find(u => u.id === selectedStudent);
+        if (!task || !student) return;
+
+        const newReward = {
+          id: 'rev_' + uid(),
+          taskId: task.id,
+          studentId: student.id,
+          title: `Misión Cumplida: ${task.title}`,
+          xp: task.reward.xp,
+          amz: task.reward.amz,
+          attr: task.reward.attr,
+          attrAmount: task.reward.attrAmount,
+          createdAt: nowISO(),
+          pending: true
+        };
+
+        setRewards(prev => [...prev, newReward]);
+        showToast(`Misión validada para ${student.name}. ¡Otorga su cofre en el panel!`, 'success');
+      };
+
+      const handleInstantReward = (tier) => {
+        if (!selectedStudent) {
+          showToast('Selecciona a un estudiante de la lista.', 'error');
+          return;
+        }
+        const student = users.find(u => u.id === selectedStudent);
+        if (!student) return;
+
+        const values = tier === 'basic' ? { xp: 15, amz: 3 } : tier === 'medium' ? { xp: 35, amz: 10 } : { xp: 80, amz: 25 };
+        const attributes = ['strength', 'agility', 'intelligence'];
+        const selectedAttr = randomOf(attributes);
+
+        const instantRewardObj = {
+          id: 'rev_' + uid(),
+          taskId: null,
+          studentId: student.id,
+          title: `Bono Rápido por Mérito Escolar (${tier.toUpperCase()})`,
+          xp: values.xp,
+          amz: values.amz,
+          attr: selectedAttr,
+          attrAmount: 0.3,
+          createdAt: nowISO(),
+          pending: true
+        };
+
+        setRewards(prev => [...prev, instantRewardObj]);
+        showToast(`Bono instantáneo registrado para ${student.name}.`, 'success');
+      };
+
+      const handleClaimReward = (rewardId) => {
+        const reward = rewards.find(r => r.id === rewardId);
+        if (!reward) return;
+
+        setUsers(prev => prev.map(u => {
+          if (u.id !== reward.studentId) return u;
+          const currentStats = { ...(u.stats || { strength: 0, agility: 0, intelligence: 0 }) };
+          if (reward.attr) {
+            currentStats[reward.attr] = Number(((currentStats[reward.attr] || 0) + reward.attrAmount).toFixed(1));
+          }
+          return applyLevelUpCheck({
+            ...u,
+            xp: (u.xp || 0) + reward.xp,
+            amz: (u.amz || 0) + reward.amz,
+            stats: currentStats,
+            tasksCompleted: (u.tasksCompleted || 0) + 1,
+            lastTaskAt: nowISO()
+          });
+        }));
+
+        setRewards(prev => prev.filter(r => r.id !== rewardId));
+        showToast(`¡Recompensa cobrada con éxito! +${reward.xp} XP y +${reward.amz} AMZ V`, 'gold');
+      };
+
+      const handleBuyItem = (itemId) => {
+        if (!currentUser || currentUser.role !== 'student') {
+          showToast('Solo los aventureros escolares (estudiantes) pueden comprar ítems.', 'error');
+          return;
+        }
+        const item = items.find(i => i.id === itemId);
+        if (!item) return;
+
+        const backpackKey = currentUser.backpack || 'level1';
+        const currentBackpackLimit = backpacks[backpackKey]?.capacity || 5;
+
+        if (myCapacityUsed >= currentBackpackLimit) {
+          showToast('Tu mochila está llena. Libera espacio o consigue una mochila superior.', 'error');
+          return;
+        }
+
+        if ((currentUser.amz || 0) < item.price) {
+          showToast('Créditos AMZ V insuficientes para este equipamiento.', 'error');
+          return;
+        }
+
+        patchUser(currentUser.id, { amz: (currentUser.amz || 0) - item.price });
+
+        setInventory(prev => {
+          const userInv = [...(prev[currentUser.id] || [])];
+          const existing = userInv.find(x => x.itemId === itemId);
+          if (existing) {
+            existing.qty += 1;
+          } else {
+            userInv.push({ itemId, qty: 1, uses: 0 });
+          }
+          return { ...prev, [currentUser.id]: userInv };
+        });
+
+        showToast(`Adquiriste: ${item.emoji} ${item.name}!`, 'success');
+      };
+
+      const handleUseItem = () => {
+        if (!selectedItemToUse || !selectedTeacherForUse) {
+          showToast('Selecciona un objeto y el tutor destinatario.', 'error');
+          return;
+        }
+
+        const item = items.find(i => i.id === selectedItemToUse);
+        if (!item || item.useType === 'No Utilizable') {
+          showToast('Este objeto es pasivo y no se puede activar.', 'error');
+          return;
+        }
+
+        const userInv = [...(inventory[currentUser.id] || [])];
+        const idx = userInv.findIndex(x => x.itemId === selectedItemToUse);
+        if (idx < 0) return;
+
+        const eventNotification = {
+          id: 'not_' + uid(),
+          teacherId: selectedTeacherForUse,
+          studentId: currentUser.id,
+          studentName: currentUser.name,
+          itemId: item.id,
+          itemName: item.name,
+          itemEmoji: item.emoji,
+          date: nowISO(),
+          read: false
+        };
+
+        setNotifications(prev => [eventNotification, ...prev]);
+
+        if (item.useType === 'Uso Único') {
+          userInv[idx].qty -= 1;
+          if (userInv[idx].qty <= 0) {
+            userInv.splice(idx, 1);
+          }
+        } else {
+          userInv[idx].uses = (userInv[idx].uses || 0) + 1;
+        }
+
+        setInventory(prev => ({ ...prev, [currentUser.id]: userInv }));
+        setSelectedItemToUse('');
+        showToast(`¡${item.name} activado! El docente ha sido alertado.`, 'success');
+      };
+
+      const handleEquipBackpack = (key) => {
+        const target = backpacks[key];
+        if (!target) return;
+
+        if (currentUser.level < target.levelReq) {
+          showToast(`Necesitas Nivel ${target.levelReq} para equipar este saco.`, 'error');
+          return;
+        }
+
+        patchUser(currentUser.id, { backpack: key });
+        showToast(`Has equipado: ${target.name}`, 'info');
+      };
+
+      const handleAvatarUpload = (userId, file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          patchUser(userId, { avatar: e.target.result });
+          showToast('Avatar personalizado actualizado correctamente.', 'success');
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const handleItemImageUpload = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setItemForm(prev => ({ ...prev, image: e.target.result }));
+          showToast('Imagen del ítem cargada en caché.', 'info');
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const handleSaveCatalogItem = () => {
+        if (!itemForm.id || !itemForm.name) {
+          showToast('Completa ID y Nombre para guardar el ítem.', 'error');
+          return;
+        }
+
+        const formatted = {
+          id: itemForm.id,
+          name: itemForm.name,
+          description: itemForm.description || 'Sin descripción',
+          price: Math.max(1, Number(itemForm.price)),
+          useType: itemForm.useType,
+          emoji: itemForm.emoji || '🎁',
+          image: itemForm.image || ''
+        };
+
+        setItems(prev => {
+          const idx = prev.findIndex(i => i.id === formatted.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = formatted;
+            return next;
+          }
+          return [...prev, formatted];
+        });
+
+        showToast('Catálogo de equipamiento actualizado.', 'success');
+        setItemForm({ id: '', name: '', description: '', price: 15, useType: 'Uso Único', emoji: '🎁' });
+      };
+
+      const myPendingRewards = useMemo(() => {
+        if (!currentUser) return [];
+        return rewards.filter(r => r.studentId === currentUser.id && r.pending);
+      }, [rewards, currentUser]);
+
+      return (
+        <div className="max-w-7xl mx-auto space-y-6">
+
+          {/* Marquee Banner */}
+          <div className="marquee-container text-purple-400 font-pixel tracking-widest text-[9px] md:text-xs py-2.5">
+            <div className="marquee-content">
+              {marqueeText}
+            </div>
+          </div>
+
+          {/* Toast Notifications */}
+          <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+            {toasts.map(t => (
+              <div key={t.id} className={`p-4 rounded-lg shadow-2xl flex items-center gap-3 border-2 text-sm font-bold animate-bounce duration-300 ${
+                t.type === 'error' ? 'bg-slate-900 border-red-500 text-red-400' :
+                t.type === 'info' ? 'bg-slate-900 border-indigo-500 text-indigo-400' :
+                t.type === 'gold' ? 'bg-slate-900 border-amber-500 text-amber-400' :
+                'bg-slate-900 border-emerald-500 text-emerald-400'
+              }`}>
+                <span className="text-xl">{t.type === 'error' ? '⚠️' : t.type === 'info' ? '🔮' : t.type === 'gold' ? '💎' : '✅'}</span>
+                <div className="flex-1">{t.message}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Level Up Overlay */}
+          {levelUpOverlay && (
+            <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4 text-center">
+              <div className="text-8xl animate-pulse mb-6">🏆</div>
+              <h2 className="text-4xl md:text-6xl font-pixel text-amber-400 font-extrabold tracking-widest pulsing-glow mb-4">
+                ¡LEVEL UP!
+              </h2>
+              <p className="text-xl font-semibold text-slate-100 max-w-lg mb-8">
+                Felicidades <span className="text-indigo-400 font-bold">{levelUpOverlay.studentName}</span>, has superado tus desafíos y has alcanzado el <span className="text-emerald-400 font-extrabold">Nivel {levelUpOverlay.level}</span>!
+              </p>
+              <button 
+                className="px-8 py-3 bg-indigo-600 border-2 border-indigo-400 rounded-lg font-bold hover:bg-indigo-500 shadow-lg text-white"
+                onClick={() => setLevelUpOverlay(null)}
+              >
+                Continuar Aventura
+              </button>
+            </div>
+          )}
+
+          {/* Confirm Modal */}
+          {confirmModal && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="rpg-panel p-6 max-w-md w-full !border-red-500">
+                <h3 className="text-lg font-bold text-red-400 mb-3 font-pixel">⚠️ Confirmar Acción</h3>
+                <p className="text-slate-300 text-sm mb-6">{confirmModal.message}</p>
+                <div className="flex gap-3 justify-end">
+                  <button 
+                    className="px-4 py-2 bg-slate-800 border-2 border-slate-600 rounded-lg text-xs font-bold hover:bg-slate-700"
+                    onClick={() => setConfirmModal(null)}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    className="px-4 py-2 bg-red-600 border-2 border-red-400 rounded-lg text-xs font-bold hover:bg-red-500"
+                    onClick={() => {
+                      confirmModal.onConfirm();
+                      setConfirmModal(null);
+                    }}
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* Header */}
+          <div className="rpg-panel flicker-neon p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl md:text-4xl">⚔️</span>
+                <h1 className="text-2xl md:text-3xl font-pixel tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-emerald-400 font-black">
+                  School RPG
+                </h1>
+              </div>
+              <p className="text-sm text-slate-400 max-w-xl font-medium">
+                Gamifica tus misiones escolares. Sube de nivel, acumula AMZ V, adquiere cofres con mochila dinámica y gestiona misiones de rol.
+              </p>
+            </div>
+
+            {currentUser ? (
+              <div className="flex items-center gap-4 bg-slate-900/80 p-3 rounded-lg border-2 border-slate-800">
+                <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-800 border-2 border-indigo-500 flex items-center justify-center relative">
+                  {currentUser.avatar ? (
+                    <img className="w-full h-full object-cover pixelated" src={currentUser.avatar} alt="avatar" />
+                  ) : (
+                    <span className="text-2xl">🧙</span>
+                  )}
+                </div>
+                <div>
+                  <div className="font-bold text-slate-200 text-xl">{currentUser.name}</div>
+                  <div className="text-sm font-medium text-indigo-400 flex items-center gap-2">
+                    <span>Nivel {currentUser.level}</span>
+                    <span>•</span>
+                    <span className="text-amber-400 font-bold">🪙 {currentUser.amz} AMZ V</span>
+                  </div>
+                </div>
+                <button className="px-3 py-1.5 bg-slate-800 border-2 border-slate-600 hover:bg-slate-700 text-sm font-bold rounded-lg" onClick={handleLogout}>
+                  Salir
+                </button>
+              </div>
+            ) : (
+              <span className="text-slate-500 text-sm font-bold font-pixel uppercase">INICIE SESIÓN EN EL TERMINAL</span>
+            )}
+          </div>
+
+          {/* Not logged in screen */}
+          {!currentUser ? (
+            <div className="rpg-panel p-8 max-w-md mx-auto space-y-6">
+              <h2 className="text-xl font-pixel text-center text-indigo-400">INICIAR SESIÓN</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-400 mb-2">Nombre de Usuario</label>
+                  <input 
+                    type="text" 
+                    className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500"
+                    placeholder="Escribe 'student', 'teacher' o 'admin'..."
+                    value={login.username}
+                    onChange={e => setLogin({ ...login, username: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-400 mb-2">Contraseña</label>
+                  <input 
+                    type="password" 
+                    className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500"
+                    placeholder="Clave de acceso..."
+                    value={login.password}
+                    onChange={e => setLogin({ ...login, password: e.target.value })}
+                    onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                  />
+                </div>
+                <button 
+                  onClick={handleLogin}
+                  className="w-full py-3 bg-indigo-600 border-2 border-indigo-400 hover:bg-indigo-500 rounded-lg font-bold tracking-wider text-lg"
+                >
+                  Entrar al Reino
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              
+              {/* Navigation tabs */}
+              <div className="flex flex-wrap gap-2 p-2 bg-slate-950 rounded-lg border-2 border-slate-800">
+                {[
+                  { key: 'home', label: '🏠 Inicio' },
+                  { key: 'profile', label: '🧙 Mi Personaje' },
+                  { key: 'tasks', label: '📋 Misiones Escolares' },
+                  { key: 'shop', label: '🛒 Tienda Mágica' },
+                  { key: 'inventory', label: `🎒 Inventario (${myCapacityUsed}/${currentUser.role === 'student' ? backpacks[currentUser.backpack || 'level1']?.capacity : 0})` },
+                  { key: 'leaderboard', label: '🏆 Salón de la Fama' },
+                  { key: 'admin', label: '⚙️ Panel de Gestión', requireAdmin: true }
+                ].map(item => {
+                  if (item.requireAdmin && currentUser.role !== 'admin') return null;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setTab(item.key)}
+                      className={`px-4 py-2 text-sm md:text-base font-bold rounded-lg border-2 transition ${
+                        tab === item.key 
+                        ? 'bg-indigo-600 border-indigo-400 text-white' 
+                        : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* TAB: HOME */}
+              {tab === 'home' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="rpg-panel p-5 space-y-4">
+                    <h3 className="text-base font-pixel text-indigo-400">ESTADO DEL HÉROE</h3>
+                    <div className="space-y-2 text-base">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-bold">Nombre:</span>
+                        <span className="font-bold">{currentUser.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-bold">Rol:</span>
+                        <span className="font-bold text-indigo-300">{roleLabel(currentUser.role)}</span>
+                      </div>
+                      {currentUser.role === 'student' && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-bold">Clase RPG:</span>
+                            <span className="font-bold text-emerald-400">{currentUser.character || 'Ninguno'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-bold">Sección:</span>
+                            <span className="font-bold text-indigo-400">{currentUser.course || '6to de Primaria'}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {currentUser.role === 'student' && (
+                      <div className="space-y-2 pt-2 border-t-2 border-slate-800">
+                        <div className="flex justify-between text-sm font-bold text-slate-400">
+                          <span>Nivel {currentUser.level}</span>
+                          <span>{currentUser.xp} / {xpNeed(currentUser.level)} XP</span>
+                        </div>
+                        <div className="w-full bg-slate-950 h-4 rounded-full overflow-hidden border-2 border-slate-800">
+                          <div 
+                            className="bg-indigo-500 h-full transition-all duration-500" 
+                            style={{ width: `${Math.min(100, (currentUser.xp / xpNeed(currentUser.level)) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rpg-panel p-5 space-y-4">
+                    <h3 className="text-base font-pixel text-emerald-400">ATRIBUTOS</h3>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div className="bg-slate-950 p-3 rounded-lg border-2 border-slate-800">
+                        <div className="text-xl">💪</div>
+                        <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Fuerza</div>
+                        <div className="font-black text-slate-200 text-xl">{(currentUser.stats?.strength || 0).toFixed(1)}</div>
+                      </div>
+                      <div className="bg-slate-950 p-3 rounded-lg border-2 border-slate-800">
+                        <div className="text-xl">⚡</div>
+                        <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Agilidad</div>
+                        <div className="font-black text-slate-200 text-xl">{(currentUser.stats?.agility || 0).toFixed(1)}</div>
+                      </div>
+                      <div className="bg-slate-950 p-3 rounded-lg border-2 border-slate-800">
+                        <div className="text-xl">🧠</div>
+                        <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Intelecto</div>
+                        <div className="font-black text-slate-200 text-xl">{(currentUser.stats?.intelligence || 0).toFixed(1)}</div>
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-sm text-slate-400 pt-2 border-t-2 border-slate-800">
+                      <div className="flex justify-between">
+                        <span className="font-bold">Misiones completadas:</span>
+                        <span className="font-bold text-emerald-400">{currentUser.tasksCompleted || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-bold">Última actividad:</span>
+                        <span className="font-bold text-indigo-400">
+                          {currentUser.lastTaskAt ? timeLabel(currentUser.lastTaskAt) : 'Ninguna'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rpg-panel p-5 space-y-4">
+                    <h3 className="text-base font-pixel text-amber-400">MOCHILA ACTUAL</h3>
+                    {currentUser.role === 'student' ? (
+                      <div className="space-y-4">
+                        <div className="space-y-2 text-base">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-bold">Modelo:</span>
+                            <span className="font-bold text-amber-400">{backpacks[currentUser.backpack || 'level1']?.name}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-bold">Capacidad:</span>
+                            <span className="font-bold">{myCapacityUsed} / {backpacks[currentUser.backpack || 'level1']?.capacity} slots</span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-slate-950 h-4 rounded-full overflow-hidden border-2 border-slate-800">
+                          <div 
+                            className="bg-amber-400 h-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, (myCapacityUsed / backpacks[currentUser.backpack || 'level1']?.capacity) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-slate-500 text-base py-4 text-center font-bold">
+                        Solo los perfiles de estudiantes manejan mochilas e inventario activo de compra.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: PROFILE */}
+              {tab === 'profile' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="rpg-panel p-6 space-y-6">
+                    <h3 className="text-base font-pixel text-indigo-400">PERFIL FÍSICO</h3>
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                      <div className="w-24 h-24 rounded-lg bg-slate-950 border-4 border-indigo-500 flex items-center justify-center overflow-hidden relative">
+                        {currentUser.avatar ? (
+                          <img className="w-full h-full object-cover pixelated" src={currentUser.avatar} alt="custom avatar" />
+                        ) : (
+                          <span className="text-4xl">🧙</span>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Subir foto o retrato personalizado</h4>
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={e => e.target.files?.[0] && handleAvatarUpload(currentUser.id, e.target.files[0])}
+                          className="text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-slate-700 file:text-sm file:font-bold file:bg-slate-800 file:text-slate-300 hover:file:bg-slate-700 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rpg-panel p-6 space-y-4">
+                    <h3 className="text-base font-pixel text-emerald-400">COFRES DE RECOMPENSA</h3>
+                    <div className="space-y-3">
+                      {myPendingRewards.length === 0 ? (
+                        <p className="text-slate-500 text-base py-4 text-center font-bold">No tienes cofres de recompensas pendientes de reclamación.</p>
+                      ) : (
+                        myPendingRewards.map(r => (
+                          <div key={r.id} className="bg-slate-950 p-4 rounded-lg border-2 border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                              <div className="font-bold text-base text-amber-400">{r.title}</div>
+                              <div className="text-sm text-slate-500">Recibido: {timeLabel(r.createdAt)}</div>
+                            </div>
+                            <button 
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 border-2 border-emerald-400 text-sm font-bold rounded-lg text-white shadow-lg transition"
+                              onClick={() => handleClaimReward(r.id)}
+                            >
+                              Abrir Cofre
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: TASKS */}
+              {tab === 'tasks' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
+                    <div className="rpg-panel p-6 space-y-4 h-fit">
+                      <h3 className="text-base font-pixel text-indigo-400">LANZAR MISIÓN</h3>
+                      <div className="space-y-3 text-base">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Título del Desafío</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                            placeholder="Ej: Completar ecuaciones básicas..."
+                            value={taskForm.title}
+                            onChange={e => setTaskForm({ ...taskForm, title: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Descripción de Requisitos</label>
+                          <textarea 
+                            className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                            placeholder="Pasos para que el alumno supere la misión..."
+                            rows="3"
+                            value={taskForm.description}
+                            onChange={e => setTaskForm({ ...taskForm, description: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Recompensa XP</label>
+                            <input 
+                              type="number" 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none"
+                              value={taskForm.xp}
+                              onChange={e => setTaskForm({ ...taskForm, xp: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Monedas AMZ V</label>
+                            <input 
+                              type="number" 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none"
+                              value={taskForm.amz}
+                              onChange={e => setTaskForm({ ...taskForm, amz: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Atributo RPG</label>
+                            <select 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none"
+                              value={taskForm.attr}
+                              onChange={e => setTaskForm({ ...taskForm, attr: e.target.value })}
+                            >
+                              <option value="strength">Fuerza 💪</option>
+                              <option value="agility">Agilidad ⚡</option>
+                              <option value="intelligence">Intelecto 🧠</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Aumento (+)</label>
+                            <input 
+                              type="number" 
+                              step="0.1"
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none"
+                              value={taskForm.attrAmount}
+                              onChange={e => setTaskForm({ ...taskForm, attrAmount: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Ámbito</label>
+                          <select 
+                            className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none"
+                            value={taskForm.type}
+                            onChange={e => setTaskForm({ ...taskForm, type: e.target.value })}
+                          >
+                            <option value="global">Global (Todo el Colegio)</option>
+                            <option value="course">Específico por Sección</option>
+                          </select>
+                        </div>
+                        {taskForm.type === 'course' && (
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Escribir Grado/Curso</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none"
+                              placeholder="Ej: 6to de Primaria"
+                              value={taskForm.targetCourse}
+                              onChange={e => setTaskForm({ ...taskForm, targetCourse: e.target.value })}
+                            />
+                          </div>
+                        )}
+                        <button 
+                          onClick={handleCreateTask}
+                          className="w-full py-3 bg-indigo-600 border-2 border-indigo-400 hover:bg-indigo-500 rounded-lg font-bold text-sm"
+                        >
+                          Publicar Desafío
+                        </button>
+                      </div>
+
+                      <div className="border-t-2 border-slate-800 pt-4 space-y-3 text-base">
+                        <h4 className="text-sm font-pixel text-emerald-400">APROBACIÓN DE MISIONES</h4>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Seleccionar Desafío</label>
+                          <select 
+                            className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 text-sm focus:outline-none"
+                            value={selectedTask}
+                            onChange={e => setSelectedTask(e.target.value)}
+                          >
+                            <option value="">-- Misiones del tablón --</option>
+                            {tasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Estudiante Evaluado</label>
+                          <select 
+                            className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 text-sm focus:outline-none"
+                            value={selectedStudent}
+                            onChange={e => setSelectedStudent(e.target.value)}
+                          >
+                            <option value="">-- Elegir estudiante --</option>
+                            {studentUsers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.course})</option>)}
+                          </select>
+                        </div>
+                        <button 
+                          onClick={handleValidateTask}
+                          className="w-full py-2.5 bg-emerald-600 border-2 border-emerald-400 hover:bg-emerald-500 rounded-lg text-sm font-bold"
+                        >
+                          Registrar Misión Cumplida
+                        </button>
+                      </div>
+
+                      <div className="border-t-2 border-slate-800 pt-4 space-y-2">
+                        <h4 className="text-sm font-pixel text-amber-400">MÉRITO ACADÉMICO RÁPIDO</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button onClick={() => handleInstantReward('basic')} className="py-2 bg-slate-950 border-2 border-slate-800 hover:bg-slate-900 rounded-lg text-xs font-bold text-slate-300">Común</button>
+                          <button onClick={() => handleInstantReward('medium')} className="py-2 bg-slate-950 border-2 border-amber-900 text-amber-400 hover:bg-slate-900 rounded-lg text-xs font-bold">Raro</button>
+                          <button onClick={() => handleInstantReward('epic')} className="py-2 bg-slate-950 border-2 border-purple-900 text-purple-400 hover:bg-slate-900 rounded-lg text-xs font-bold">Épico</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`space-y-4 ${(currentUser.role === 'teacher' || currentUser.role === 'admin') ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+                    <h3 className="text-base font-pixel text-indigo-400">TABLÓN DE ANUNCIOS</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {tasks.length === 0 ? (
+                        <p className="text-slate-500 text-base p-8 text-center col-span-2 font-bold">No hay misiones escolares activas en este momento.</p>
+                      ) : (
+                        tasks.map(t => (
+                          <div key={t.id} className="rpg-card p-5 flex flex-col justify-between">
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start gap-2">
+                                <span className={`px-2.5 py-0.5 rounded-lg text-xs font-bold border-2 ${t.type === 'global' ? 'bg-indigo-950 text-indigo-300 border-indigo-900' : 'bg-emerald-950 text-emerald-300 border-emerald-900'}`}>
+                                  {t.type === 'global' ? '🌍 Global' : `🏫 ${t.targetCourse}`}
+                                </span>
+                                {(currentUser.role === 'admin' || t.creatorId === currentUser?.id) && (
+                                  <button onClick={() => handleDeleteTask(t.id)} className="text-red-400 hover:text-red-300 text-sm font-bold">
+                                    Eliminar
+                                  </button>
+                                )}
+                              </div>
+                              <h4 className="font-bold text-slate-200 text-xl">{t.title}</h4>
+                              <p className="text-slate-400 text-base leading-relaxed">{t.description}</p>
+                            </div>
+
+                            <div className="pt-4 mt-4 border-t-2 border-slate-800 flex flex-wrap justify-between items-center gap-2">
+                              <div className="flex gap-2 text-xs font-pixel text-slate-300">
+                                <span className="bg-slate-950 px-2 py-1 border-2 border-slate-800 text-emerald-400">+{t.reward?.xp} XP</span>
+                                <span className="bg-slate-950 px-2 py-1 border-2 border-slate-800 text-amber-400">🪙 {t.reward?.amz} AMZ V</span>
+                              </div>
+                              <span className="text-sm text-slate-500 font-bold">Por {t.creatorName}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: SHOP */}
+              {tab === 'shop' && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 rpg-panel p-4">
+                    <h3 className="text-base font-pixel text-indigo-400 m-0">TIENDA ESCOLAR MÁGICA</h3>
+                    <div className="px-4 py-2 bg-slate-950 rounded-lg border-2 border-slate-800 text-slate-300 text-base font-bold">
+                      Tus Créditos: <span className="text-amber-400 font-black">🪙 {currentUser.amz} AMZ V</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                    {items.map(item => (
+                      <div key={item.id} className="rpg-card p-4 flex flex-col justify-between gap-4">
+                        <div className="space-y-3">
+                          <div className="w-full h-32 rounded-lg bg-slate-950 border-2 border-slate-800 flex items-center justify-center relative overflow-hidden">
+                            {item.image ? (
+                              <img className="w-full h-full object-cover pixelated" src={item.image} alt={item.name} />
+                            ) : (
+                              <span className="text-6xl drop-shadow-lg">{item.emoji}</span>
+                            )}
+                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded bg-slate-900 border-2 border-slate-800 text-xs font-bold text-slate-300">
+                              {item.useType}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-100 text-lg">{item.name}</h4>
+                            <p className="text-slate-400 text-sm line-clamp-2 mt-1 leading-relaxed">{item.description}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t-2 border-slate-800">
+                          <span className="font-extrabold text-amber-400 text-lg">🪙 {item.price} AMZ V</span>
+                          {currentUser.role === 'student' ? (
+                            <button 
+                              onClick={() => handleBuyItem(item.id)}
+                              className="px-4 py-2 bg-indigo-600 border-2 border-indigo-400 hover:bg-indigo-500 text-sm font-bold rounded-lg text-white shadow-lg"
+                            >
+                              Comprar
+                            </button>
+                          ) : (
+                            <span className="text-sm text-slate-500 font-bold">Sólo Alumnos</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: INVENTORY */}
+              {tab === 'inventory' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="rpg-panel p-6 lg:col-span-2 space-y-4">
+                    <h3 className="text-base font-pixel text-indigo-400">MOCHILA ACTUAL</h3>
+                    {myInventory.length === 0 ? (
+                      <p className="text-slate-500 text-base py-12 text-center font-bold">No llevas ningún equipamiento en tu bolsa en este momento.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {myInventory.map(slot => {
+                          const item = items.find(i => i.id === slot.itemId);
+                          if (!item) return null;
+                          return (
+                            <div key={slot.itemId} className="bg-slate-950 p-4 rounded-lg border-2 border-slate-800 flex flex-col justify-between gap-3">
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-start gap-2">
+                                  <span className="font-bold text-slate-200 text-lg">{item.emoji} {item.name}</span>
+                                  <span className="bg-slate-900 border-2 border-slate-700 text-slate-300 font-pixel text-[10px] px-2 py-1 rounded-lg">
+                                    Cant:{slot.qty}
+                                  </span>
+                                </div>
+                                <p className="text-slate-400 text-sm">{item.description}</p>
+                                <div className="text-sm text-indigo-400 font-bold">
+                                  Tipo: <span className="text-indigo-300">{item.useType}</span>
+                                  {item.useType === 'Uso Múltiple' && ` (Activado ${slot.uses} veces)`}
+                                </div>
+                              </div>
+
+                              {item.useType !== 'No Utilizable' && (
+                                <div className="pt-2 border-t-2 border-slate-800 space-y-2">
+                                  <div className="flex flex-col sm:flex-row gap-2">
+                                    <select 
+                                      className="flex-1 bg-slate-900 border-2 border-slate-700 rounded-lg p-2 text-sm text-slate-300 focus:outline-none font-bold"
+                                      value={selectedItemToUse === item.id ? selectedTeacherForUse : ''}
+                                      onChange={e => {
+                                        setSelectedItemToUse(item.id);
+                                        setSelectedTeacherForUse(e.target.value);
+                                      }}
+                                    >
+                                      <option value="">-- Enviar a Docente --</option>
+                                      {teacherUsers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                    </select>
+                                    <button 
+                                      className="px-4 py-2 bg-emerald-600 border-2 border-emerald-400 hover:bg-emerald-500 rounded-lg text-sm font-bold"
+                                      onClick={handleUseItem}
+                                    >
+                                      Activar
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {currentUser.role === 'student' && (
+                    <div className="rpg-panel p-6 space-y-4 h-fit">
+                      <h3 className="text-base font-pixel text-amber-400">MEJORAR MOCHILAS</h3>
+                      <p className="text-sm text-slate-400 leading-relaxed font-bold">
+                        Desbloquea mochilas de mayor tamaño conforme subas de nivel para cargar un inventario escolar más amplio.
+                      </p>
+
+                      <div className="space-y-3">
+                        {Object.keys(backpacks).map(key => {
+                          const pack = backpacks[key];
+                          const active = currentUser.backpack === key;
+                          const eligible = currentUser.level >= pack.levelReq;
+
+                          return (
+                            <div 
+                              key={key} 
+                              className={`p-4 rounded-lg border-2 flex items-center justify-between transition-all ${
+                                active ? 'border-emerald-500 bg-emerald-950' : 'border-slate-800 bg-slate-950'
+                              }`}
+                            >
+                              <div className="space-y-1">
+                                <div className="font-bold text-base text-slate-200 flex items-center gap-2">
+                                  <span>{pack.emoji} {pack.name}</span>
+                                  {active && <span className="text-[10px] font-pixel text-emerald-400 bg-emerald-900 border-2 border-emerald-700 px-2 py-0.5 rounded">Activo</span>}
+                                </div>
+                                <div className="text-sm text-slate-400 font-bold">Capacidad: {pack.capacity} slots</div>
+                                <div className="text-xs text-slate-500 font-bold">{pack.requires}</div>
+                              </div>
+
+                              {!active && (
+                                <button 
+                                  onClick={() => handleEquipBackpack(key)}
+                                  disabled={!eligible}
+                                  className={`px-3 py-2 rounded-lg text-sm font-bold transition border-2 ${
+                                    eligible 
+                                    ? 'bg-indigo-600 border-indigo-400 hover:bg-indigo-500 text-white' 
+                                    : 'bg-slate-900 text-slate-500 cursor-not-allowed border-slate-800'
+                                  }`}
+                                >
+                                  {eligible ? 'Equipar' : `Nivel ${pack.levelReq}`}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB: LEADERBOARD */}
+              {tab === 'leaderboard' && (
+                <div className="rpg-panel p-6 space-y-4">
+                  <div className="flex justify-between items-center border-b-2 border-slate-800 pb-3">
+                    <h3 className="text-base font-pixel text-amber-400">SALÓN DE LA FAMA</h3>
+                    <span className="text-sm text-slate-500 font-bold">Aventureros ordenados por nivel y misiones</span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-base">
+                      <thead>
+                        <tr className="text-sm text-slate-400 border-b-2 border-slate-800 uppercase font-bold tracking-wider">
+                          <th className="py-3 px-2 text-center">Rango</th>
+                          <th className="py-3 px-4">Estudiante</th>
+                          <th className="py-3 px-4 text-center">Nivel</th>
+                          <th className="py-3 px-4 text-center">Sección</th>
+                          <th className="py-3 px-4 text-center">Misiones</th>
+                          <th className="py-3 px-4 text-right">Clase</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {studentUsers
+                          .sort((a,b) => (b.level || 1) - (a.level || 1) || (b.tasksCompleted || 0) - (a.tasksCompleted || 0))
+                          .map((student, index) => {
+                            const isFirst = index === 0;
+                            const isSecond = index === 1;
+                            const isThird = index === 2;
+
+                            return (
+                              <tr key={student.id} className="border-b-2 border-slate-800/50 hover:bg-slate-900 transition">
+                                <td className="py-4 px-2 text-center font-bold text-2xl">
+                                  {isFirst ? '🥇' : isSecond ? '🥈' : isThird ? '🥉' : index + 1}
+                                </td>
+                                <td className="py-4 px-4 font-bold text-slate-100 text-xl">
+                                  {student.name} {student.id === currentUser?.id && <span className="ml-2 text-[12px] bg-indigo-950 border-2 border-indigo-900 text-indigo-400 px-2 py-0.5 rounded-lg">Tú</span>}
+                                </td>
+                                <td className="py-4 px-4 text-center font-black text-emerald-400 text-xl">
+                                  {student.level}
+                                </td>
+                                <td className="py-4 px-4 text-center text-slate-400 font-bold">
+                                  {student.course}
+                                </td>
+                                <td className="py-4 px-4 text-center text-slate-300 font-bold text-xl">
+                                  {student.tasksCompleted || 0}
+                                </td>
+                                <td className="py-4 px-4 text-right font-bold text-indigo-400">
+                                  {student.character}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: NOTIFICATIONS */}
+              {tab === 'notifications' && (
+                <div className="rpg-panel p-6 space-y-4">
+                  <div className="flex justify-between items-center border-b-2 border-slate-800 pb-3">
+                    <h3 className="text-base font-pixel text-indigo-400">REGISTRO DE ALERTAS</h3>
+                    <button 
+                      onClick={() => setNotifications([])}
+                      className="px-4 py-2 bg-slate-900 border-2 border-slate-700 text-sm font-bold hover:bg-slate-800 rounded-lg"
+                    >
+                      Limpiar Historial
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {notifications.length === 0 ? (
+                      <p className="text-slate-500 text-base py-12 text-center font-bold">No hay eventos o activaciones de objetos registradas.</p>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className="p-4 rounded-lg bg-slate-950 border-2 border-slate-800 flex justify-between items-center">
+                          <div className="space-y-1 text-base">
+                            <div className="font-bold text-slate-200">
+                              🛡️ <span className="text-indigo-400 font-black">{n.studentName}</span> ha activado <span className="text-amber-400 font-black">"{n.itemEmoji} {n.itemName}"</span>
+                            </div>
+                            <div className="text-sm text-slate-500 font-bold">Fecha del evento: {timeLabel(n.date)}</div>
+                          </div>
+                          <span className="text-xs text-indigo-400 bg-indigo-950 border-2 border-indigo-900 px-3 py-1.5 rounded-lg font-bold">Recibido</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: ADMIN */}
+              {tab === 'admin' && currentUser.role === 'admin' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="rpg-panel p-6 space-y-4">
+                    <h3 className="text-base font-pixel text-indigo-400 font-bold">MATRÍCULA DE PERSONAJES</h3>
+                    <div className="space-y-3 text-base">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-400 mb-1">Nombre Completo</label>
+                        <input 
+                          type="text" 
+                          className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                          placeholder="Ej: Arturo Pendragon..."
+                          value={userForm.name}
+                          onChange={e => setUserForm({ ...userForm, name: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Usuario de Acceso</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                            placeholder="Usuario único..."
+                            value={userForm.username}
+                            onChange={e => setUserForm({ ...userForm, username: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Clave de Acceso</label>
+                          <input 
+                            type="password" 
+                            className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                            placeholder="Clave..."
+                            value={userForm.password}
+                            onChange={e => setUserForm({ ...userForm, password: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-400 mb-1">Rol en el Sistema</label>
+                        <select 
+                          className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none"
+                          value={userForm.role}
+                          onChange={e => setUserForm({ ...userForm, role: e.target.value })}
+                        >
+                          <option value="student">Estudiante 🛡️</option>
+                          <option value="teacher">Profesor Tutor 🧙‍♀️</option>
+                        </select>
+                      </div>
+
+                      {userForm.role === 'student' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Sección/Grado</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none"
+                              placeholder="Ej: 6to de Primaria"
+                              value={userForm.course}
+                              onChange={e => setUserForm({ ...userForm, course: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Clase RPG</label>
+                            <select 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none"
+                              value={userForm.character}
+                              onChange={e => setUserForm({ ...userForm, character: e.target.value })}
+                            >
+                              {characters.map(c => (
+                                <option key={c.name} value={c.name}>{c.emoji} {c.name} ({c.class})</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      <button 
+                        onClick={handleCreateUser}
+                        className="w-full py-3 bg-indigo-600 border-2 border-indigo-400 hover:bg-indigo-500 rounded-lg font-bold text-sm"
+                      >
+                        Registrar Personaje Escolar
+                      </button>
+                    </div>
+
+                    <div className="border-t-2 border-slate-800 pt-4 space-y-2">
+                      <h4 className="text-sm font-pixel text-slate-300">ADMINISTRACIÓN DE RECURSOS</h4>
+                      <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
+                        {users.map(u => (
+                          <div key={u.id} className="p-3 bg-slate-950 rounded-lg border-2 border-slate-800 flex justify-between items-center text-sm">
+                            <div>
+                              <div className="font-bold text-base">{u.name}</div>
+                              <div className="text-slate-400 text-xs font-bold">{roleLabel(u.role)} • 🪙 {u.amz} AMZ V</div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => patchUser(u.id, { amz: (u.amz || 0) + 20 })} className="px-2 py-1 bg-slate-900 text-emerald-400 font-bold border-2 border-slate-700 rounded-lg hover:bg-slate-800">+20</button>
+                              <button onClick={() => patchUser(u.id, { amz: Math.max(0, (u.amz || 0) - 20) })} className="px-2 py-1 bg-slate-900 text-red-400 font-bold border-2 border-slate-700 rounded-lg hover:bg-slate-800">-20</button>
+                              {u.id !== 'admin' && (
+                                <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1 bg-red-950 border-2 border-red-800 rounded-lg text-red-300 font-bold hover:bg-red-900">❌</button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Panel Combinado de Letrero / Catálogo */}
+                  <div className="space-y-6">
+                    {/* Marquee Settings */}
+                    <div className="rpg-panel p-6 space-y-4 h-fit border-purple-500/50">
+                      <h3 className="text-base font-pixel text-purple-400 font-bold">📢 MARQUESINA ARCADE</h3>
+                      <p className="text-sm text-slate-400 leading-relaxed font-bold">
+                        Modifica el anuncio superior en tiempo real para todos los estudiantes y cabinas conectadas.
+                      </p>
+                      <div className="space-y-3">
+                        <textarea
+                          className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-3 text-slate-200 text-sm focus:outline-none focus:border-purple-500"
+                          rows="3"
+                          value={marqueeText}
+                          onChange={e => setMarqueeText(e.target.value)}
+                          placeholder="Escribe el anuncio deslizante aquí..."
+                        />
+                        <button
+                          onClick={() => showToast('¡Anuncio de marquesina actualizado!', 'gold')}
+                          className="w-full py-3 bg-purple-600 border-2 border-purple-400 hover:bg-purple-500 rounded-lg font-bold text-sm shadow-lg text-white"
+                        >
+                          Actualizar Letrero
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rpg-panel p-6 space-y-4 h-fit">
+                      <h3 className="text-base font-pixel text-indigo-400 font-bold">CATÁLOGO DE LA TIENDA</h3>
+                      <div className="space-y-3 text-base">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">ID del Ítem</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                              placeholder="Ej: item_10"
+                              value={itemForm.id}
+                              onChange={e => setItemForm({ ...itemForm, id: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Nombre Comercial</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                              placeholder="Ej: Pergamino de Sabores"
+                              value={itemForm.name}
+                              onChange={e => setItemForm({ ...itemForm, name: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Descripción del Efecto</label>
+                          <textarea 
+                            className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                            placeholder="Qué hace o qué beneficio ofrece al estudiante..."
+                            rows="2"
+                            value={itemForm.description}
+                            onChange={e => setItemForm({ ...itemForm, description: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Costo AMZ</label>
+                            <input 
+                              type="number" 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none"
+                              value={itemForm.price}
+                              onChange={e => setItemForm({ ...itemForm, price: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Tipo de Uso</label>
+                            <select 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none"
+                              value={itemForm.useType}
+                              onChange={e => setItemForm({ ...itemForm, useType: e.target.value })}
+                            >
+                              <option value="Uso Único">Uso Único</option>
+                              <option value="Uso Múltiple">Uso Múltiple</option>
+                              <option value="No Utilizable">No Utilizable</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-slate-400 mb-1">Emoji</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none text-center"
+                              placeholder="⚡"
+                              value={itemForm.emoji}
+                              onChange={e => setItemForm({ ...itemForm, emoji: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-400 mb-1">Subir Imagen Real (Opcional)</label>
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={e => e.target.files?.[0] && handleItemImageUpload(e.target.files[0])}
+                            className="text-sm text-slate-300 cursor-pointer font-bold file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-slate-700 file:bg-slate-800 file:text-slate-300 hover:file:bg-slate-700"
+                          />
+                        </div>
+                        <button 
+                          onClick={handleSaveCatalogItem}
+                          className="w-full py-3 bg-indigo-600 border-2 border-indigo-400 hover:bg-indigo-500 rounded-lg font-bold text-sm shadow-lg"
+                        >
+                          Guardar Objeto en la Tienda
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
